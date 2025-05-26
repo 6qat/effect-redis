@@ -13,7 +13,7 @@ A lightweight wrapper around the official `redis` client that integrates seamles
 ## Installation
 
 ```bash
-pnpm add effect-redis redis 
+pnpm add effect-redis 
 ```
 
 > The library itself is runtime-agnostic. Under Bun you will usually also have `@effect/platform-bun` around — that is **not** required by `effect-redis`.
