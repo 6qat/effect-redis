@@ -1,8 +1,23 @@
 {
   "name": "effect-redis",
-  "module": "index.ts",
+  "version": "0.0.1",
+  "description": "Simple Effect wrapper for Redis.",
+  "module": "dist/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build:main": "bun build --minify-syntax --minify-whitespace ./src/index.ts --outdir ./dist --target node --format esm",
+    "build:types": "bun tsc --emitDeclarationOnly --outDir dist",
+    "build": "bun run build:main && bun run build:types",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "format": "biome format --write ./src",
+    "lint": "biome lint ."
+  },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@types/bun": "latest"
   },
   "peerDependencies": {
