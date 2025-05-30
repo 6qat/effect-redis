@@ -128,15 +128,13 @@ const bootstrapRedisPersistenceEffect = Effect.gen(function* () {
 
   return RedisPersistence.of({
     setValue: (key, value) =>
-      Effect.gen(function* () {
-        return yield* Effect.tryPromise({
-          try: () => client.set(key, value),
-          catch: (e) =>
-            new RedisError({
-              cause: e,
-              message: 'Error in `Redis.setValue`',
-            }),
-        });
+      Effect.tryPromise({
+        try: () => client.set(key, value),
+        catch: (e) =>
+          new RedisError({
+            cause: e,
+            message: 'Error in `Redis.setValue`',
+          }),
       }),
   });
 });
@@ -152,26 +150,22 @@ const bootstrapRedisPubSubEffect = Effect.gen(function* () {
 
   return RedisPubSub.of({
     publish: (channel, message) =>
-      Effect.gen(function* () {
-        return yield* Effect.tryPromise({
-          try: () => clientPublish.publish(channel, message),
-          catch: (e) =>
-            new RedisError({
-              cause: e,
-              message: 'Error in `Redis.publish`',
-            }),
-        });
+      Effect.tryPromise({
+        try: () => clientPublish.publish(channel, message),
+        catch: (e) =>
+          new RedisError({
+            cause: e,
+            message: 'Error in `Redis.publish`',
+          }),
       }),
     subscribe: (channel, handler) =>
-      Effect.gen(function* () {
-        return yield* Effect.tryPromise({
-          try: () => clientSubscribe.subscribe(channel, handler),
-          catch: (e) =>
-            new RedisError({
-              cause: e,
-              message: 'Error in `Redis.subscribe`',
-            }),
-        });
+      Effect.tryPromise({
+        try: () => clientSubscribe.subscribe(channel, handler),
+        catch: (e) =>
+          new RedisError({
+            cause: e,
+            message: 'Error in `Redis.subscribe`',
+          }),
       }),
   });
 });
