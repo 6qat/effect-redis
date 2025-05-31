@@ -31,36 +31,6 @@ interface RedisShape {
 }
 class Redis extends Context.Tag('Redis')<Redis, RedisShape>() {}
 
-const bootstrapRedisEffect = Effect.gen(function* () {
-  const client = yield* redisClientEffect;
-  return Redis.of({
-    use: (fn) =>
-      Effect.gen(function* () {
-        const result = yield* Effect.try({
-          try: () => fn(client),
-          catch: (e) =>
-            new RedisError({
-              cause: e,
-              message: 'Synchronous error in `Redis.use`',
-            }),
-        });
-        if (result instanceof Promise) {
-          return yield* Effect.tryPromise({
-            try: () => result,
-            catch: (e) =>
-              new RedisError({
-                cause: e,
-                message: 'Asynchronous error in `Redis.use`',
-              }),
-          });
-        }
-        return result;
-      }),
-  });
-});
-
-const RedisLive = Layer.scoped(Redis, bootstrapRedisEffect);
-
 interface RedisPubSubShape {
   publish: (
     channel: string,
@@ -89,6 +59,7 @@ class RedisPersistence extends Context.Tag('RedisPersistence')<
   RedisPersistenceShape
 >() {}
 
+// Common code for redis client creation
 const redisClientEffect = Effect.gen(function* () {
   const { options } = yield* RedisConnectionOptions;
 
@@ -123,7 +94,37 @@ const redisClientEffect = Effect.gen(function* () {
   );
 });
 
-const bootstrapRedisPersistenceEffect = Effect.gen(function* () {
+const bootstrapRedisServiceEffect = Effect.gen(function* () {
+  const client = yield* redisClientEffect;
+  return Redis.of({
+    use: (fn) =>
+      Effect.gen(function* () {
+        const result = yield* Effect.try({
+          try: () => fn(client),
+          catch: (e) =>
+            new RedisError({
+              cause: e,
+              message: 'Synchronous error in `Redis.use`',
+            }),
+        });
+        if (result instanceof Promise) {
+          return yield* Effect.tryPromise({
+            try: () => result,
+            catch: (e) =>
+              new RedisError({
+                cause: e,
+                message: 'Asynchronous error in `Redis.use`',
+              }),
+          });
+        }
+        return result;
+      }),
+  });
+});
+
+const RedisLive = Layer.scoped(Redis, bootstrapRedisServiceEffect);
+
+const bootstrapRedisPersistenceServiceEffect = Effect.gen(function* () {
   const client = yield* redisClientEffect;
 
   return RedisPersistence.of({
@@ -141,10 +142,10 @@ const bootstrapRedisPersistenceEffect = Effect.gen(function* () {
 
 const RedisPersistenceLive = Layer.scoped(
   RedisPersistence,
-  bootstrapRedisPersistenceEffect,
+  bootstrapRedisPersistenceServiceEffect,
 );
 
-const bootstrapRedisPubSubEffect = Effect.gen(function* () {
+const bootstrapRedisPubSubServiceEffect = Effect.gen(function* () {
   const clientPublish = yield* redisClientEffect;
   const clientSubscribe = yield* redisClientEffect;
 
@@ -170,7 +171,10 @@ const bootstrapRedisPubSubEffect = Effect.gen(function* () {
   });
 });
 
-const RedisPubSubLive = Layer.scoped(RedisPubSub, bootstrapRedisPubSubEffect);
+const RedisPubSubLive = Layer.scoped(
+  RedisPubSub,
+  bootstrapRedisPubSubServiceEffect,
+);
 
 export {
   RedisPersistence,
