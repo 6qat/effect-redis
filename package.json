@@ -6,7 +6,11 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
-  "files": ["dist", "src", "README.md"],
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
   "scripts": {
     "build:main": "bun build --minify-syntax --minify-whitespace ./src/index.ts --outdir ./dist --target node --format esm",
     "build:types": "bun tsc --emitDeclarationOnly --outDir dist",
@@ -21,9 +25,11 @@
     "@types/bun": "latest"
   },
   "peerDependencies": {
-    "typescript": "^5",
     "effect": "^3.16.2",
-    "redis": "^5.1.0"
+    "redis": "^5.1.0",
+    "typescript": "^5"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@effect/platform-bun": "^0.67.3"
+  }
 }

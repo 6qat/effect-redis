@@ -1,5 +1,5 @@
 import { Context, Data, Effect, Layer } from 'effect';
-import { createClient } from 'redis';
+import { type RedisArgument, createClient } from 'redis';
 
 export class RedisError extends Data.TaggedError('RedisError')<{
   cause: unknown;
@@ -57,6 +57,42 @@ interface RedisPersistenceShape {
 class RedisPersistence extends Context.Tag('RedisPersistence')<
   RedisPersistence,
   RedisPersistenceShape
+>() {}
+
+// Stream related types
+export interface StreamEntry {
+  id: RedisArgument;
+  message: Record<string, RedisArgument>;
+}
+
+interface RedisStreamShape {
+  // Add an entry to a stream
+  xadd: (
+    key: RedisArgument,
+    id: RedisArgument | '*',
+    message: Record<string, RedisArgument>,
+  ) => Effect.Effect<string, RedisError, never>;
+
+  // Read from a stream with ability to block and wait for new entries
+  xread: (
+    key: RedisArgument,
+    id: RedisArgument, // Use '$' to read only new entries from now
+    block?: number, // Block in milliseconds, 0 for indefinite
+    count?: number, // Max number of entries to return
+  ) => Effect.Effect<StreamEntry[], RedisError, never>;
+
+  // Read a range of entries from a stream
+  xrange: (
+    key: string,
+    start: string, // '-' for earliest available
+    end: string, // '+' for latest available
+    count?: number,
+  ) => Effect.Effect<StreamEntry[], RedisError, never>;
+}
+
+class RedisStream extends Context.Tag('RedisStream')<
+  RedisStream,
+  RedisStreamShape
 >() {}
 
 // Common code for redis client creation
@@ -176,13 +212,133 @@ const RedisPubSubLive = Layer.scoped(
   bootstrapRedisPubSubServiceEffect,
 );
 
+// Redis Stream implementation
+const bootstrapRedisStreamServiceEffect = Effect.gen(function* () {
+  const client = yield* redisClientEffect;
+
+  return RedisStream.of({
+    xadd: (
+      key: RedisArgument,
+      id: RedisArgument,
+      message: Record<string, RedisArgument>,
+    ) =>
+      Effect.tryPromise({
+        try: async () => {
+          // Pass the message object directly to xAdd
+          return await client.xAdd(key, id, message);
+        },
+        catch: (e) =>
+          new RedisError({
+            cause: e,
+            message: 'Error in `RedisStream.xadd`',
+          }),
+      }),
+
+    xread: (
+      key: RedisArgument,
+      id: RedisArgument,
+      block?: number,
+      count?: number,
+    ) =>
+      Effect.tryPromise({
+        try: async () => {
+          const options: Record<string, number> = {};
+
+          if (block !== undefined) {
+            options.BLOCK = block;
+          }
+
+          if (count !== undefined) {
+            options.COUNT = count;
+          }
+
+          // Create proper XReadStream objects instead of arrays
+          const streams = [{ key, id }];
+          const result = await client.xRead(streams, options);
+
+          if (!result) {
+            return [];
+          }
+
+          // Transform result into StreamEntry[] format
+          if (!Array.isArray(result)) {
+            return [];
+          }
+
+          return result.flatMap((stream) => {
+            // Type guard to check if stream has the expected structure
+            if (
+              stream &&
+              typeof stream === 'object' &&
+              'messages' in stream &&
+              Array.isArray(stream.messages)
+            ) {
+              return stream.messages.map((msg) => {
+                // Add type guard for msg
+                if (msg && typeof msg === 'object' && 'id' in msg) {
+                  return {
+                    id: String(msg.id), // Convert to string explicitly
+                    message: msg.message as Record<string, string>,
+                  };
+                }
+                // Return a default or handle error case
+                return {
+                  id: '',
+                  message: {} as Record<string, string>,
+                };
+              });
+            }
+
+            return [];
+          });
+        },
+        catch: (e) =>
+          new RedisError({
+            cause: e,
+            message: 'Error in `RedisStream.xread`',
+          }),
+      }),
+
+    xrange: (key: string, start: string, end: string, count?: number) =>
+      Effect.tryPromise({
+        try: async () => {
+          const options: Record<string, number> = {};
+
+          if (count !== undefined) {
+            options.COUNT = count;
+          }
+
+          const result = await client.xRange(key, start, end, options);
+
+          // Transform result into StreamEntry[] format
+          return result.map((msg) => ({
+            id: msg.id,
+            message: msg.message as Record<string, string>,
+          }));
+        },
+        catch: (e) =>
+          new RedisError({
+            cause: e,
+            message: 'Error in `RedisStream.xrange`',
+          }),
+      }),
+  });
+});
+
+const RedisStreamLive = Layer.scoped(
+  RedisStream,
+  bootstrapRedisStreamServiceEffect,
+);
+
 export {
   RedisPersistence,
   RedisPubSub,
   RedisConnectionOptions,
   Redis,
+  RedisStream,
   RedisPersistenceLive,
   RedisPubSubLive,
   RedisConnectionOptionsLive,
   RedisLive,
+  RedisStreamLive,
 };
