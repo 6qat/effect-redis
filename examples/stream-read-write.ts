@@ -7,8 +7,9 @@ import {
   RedisConnectionOptionsLive,
   RedisStream,
   RedisStreamLive,
-  StreamEntry,
+  type StreamEntry,
 } from '../src';
+import type { RedisArgument } from 'redis';
 
 /**
  * Example demonstrating Redis Stream operations:
@@ -40,8 +41,7 @@ const program = Effect.gen(function* () {
           Effect.tap((id) => Effect.logInfo(`Added entry with ID: ${id}`)),
         ),
       ),
-      Effect.repeat(Schedule.spaced('2 seconds')),
-      Effect.fork,
+      Effect.repeat(Schedule.spaced('1 seconds')),
     );
   });
 
@@ -51,37 +51,32 @@ const program = Effect.gen(function* () {
       'Starting stream consumer with $ identifier (only new messages)...',
     );
 
-    // Function to read new messages
-    const readNewEntries = pipe(
-      redisStream.xread(
-        streamKey,
-        '$', // Read only new entries from now
-        5000, // Block for 5 second if no data available
-      ),
-      Effect.tap((entries) => {
-        if (entries.length > 0) {
-          return Effect.logInfo(
-            `Received ${entries.length} new entries: ${JSON.stringify(entries, null, 2)}`,
-          );
-        }
-        return Effect.logInfo('No new entries received (timeout)');
-      }),
-      Effect.catchAll((error) =>
-        Effect.logError(`Error reading stream: ${error.message}`),
-      ),
-    );
+    let lastId: RedisArgument = '$';
 
-    // Repeatedly read new entries
-    yield* pipe(
-      readNewEntries,
-      Effect.repeat(Schedule.spaced('1 second')),
-      Effect.fork,
-    );
+    while (true) {
+      const entries: StreamEntry[] = yield* redisStream.xread(
+        streamKey,
+        lastId,
+        5000,
+        100,
+      );
+
+      if (entries.length > 0) {
+        lastId = entries[entries.length - 1].id;
+        yield* Effect.logInfo(
+          `Received ${entries.length} new entries: ${JSON.stringify(entries, null, 2)}`,
+        );
+      } else {
+        yield* Effect.logInfo('No new entries received (timeout)');
+      }
+
+      yield* Effect.sleep('4 seconds');
+    }
   });
 
   // Start both producer and consumer
-  yield* producer;
-  yield* consumer;
+  yield* producer.pipe(Effect.fork);
+  yield* consumer.pipe(Effect.fork);
 
   // Keep the program running
   yield* Effect.never;
