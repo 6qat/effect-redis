@@ -1,4 +1,4 @@
-import { Context, Data, Effect, Layer } from 'effect';
+import { Context, Data, Effect, Layer, type Scope } from 'effect';
 import { type RedisArgument, createClient } from 'redis';
 
 export class RedisError extends Data.TaggedError('RedisError')<{
@@ -96,7 +96,11 @@ class RedisStream extends Context.Tag('RedisStream')<
 >() {}
 
 // Common code for redis client creation
-const redisClientEffect = Effect.gen(function* () {
+const redisClientEffect: Effect.Effect<
+  ReturnType<typeof createClient>,
+  RedisError,
+  Scope.Scope | RedisConnectionOptions
+> = Effect.gen(function* () {
   const { options } = yield* RedisConnectionOptions;
 
   return yield* Effect.acquireRelease(
@@ -131,7 +135,7 @@ const redisClientEffect = Effect.gen(function* () {
 });
 
 const bootstrapRedisServiceEffect = Effect.gen(function* () {
-  const client = yield* redisClientEffect;
+  const client: ReturnType<typeof createClient> = yield* redisClientEffect;
   return Redis.of({
     use: (fn) =>
       Effect.gen(function* () {
@@ -161,7 +165,7 @@ const bootstrapRedisServiceEffect = Effect.gen(function* () {
 const RedisLive = Layer.scoped(Redis, bootstrapRedisServiceEffect);
 
 const bootstrapRedisPersistenceServiceEffect = Effect.gen(function* () {
-  const client = yield* redisClientEffect;
+  const client: ReturnType<typeof createClient> = yield* redisClientEffect;
 
   return RedisPersistence.of({
     setValue: (key, value) =>
@@ -182,8 +186,10 @@ const RedisPersistenceLive = Layer.scoped(
 );
 
 const bootstrapRedisPubSubServiceEffect = Effect.gen(function* () {
-  const clientPublish = yield* redisClientEffect;
-  const clientSubscribe = yield* redisClientEffect;
+  const clientPublish: ReturnType<typeof createClient> =
+    yield* redisClientEffect;
+  const clientSubscribe: ReturnType<typeof createClient> =
+    yield* redisClientEffect;
 
   return RedisPubSub.of({
     publish: (channel, message) =>

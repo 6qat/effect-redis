@@ -58,7 +58,6 @@ const program = Effect.gen(function* () {
         streamKey,
         lastId,
         5000,
-        100,
       );
 
       if (entries.length > 0) {
