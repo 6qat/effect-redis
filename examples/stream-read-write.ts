@@ -53,11 +53,11 @@ const program = Effect.gen(function* () {
 
     // Function to read new messages
     const readNewEntries = pipe(
-      redisStream.xread({
-        key: streamKey,
-        id: '$', // Read only new entries from now
-        block: 60000, // Block for 60 seconds if no data available
-      }),
+      redisStream.xread(
+        streamKey,
+        '$', // Read only new entries from now
+        5000, // Block for 5 second if no data available
+      ),
       Effect.tap((entries) => {
         if (entries.length > 0) {
           return Effect.logInfo(
@@ -94,11 +94,11 @@ const _readRangeExample = Effect.gen(function* () {
 
   yield* Effect.logInfo('Reading all stream entries from beginning to end...');
 
-  const entries = yield* redisStream.xrange({
-    key: streamKey,
-    start: '-', // Start from earliest entry
-    end: '+', // End with latest entry
-  });
+  const entries = yield* redisStream.xrange(
+    streamKey,
+    '-', // Start from earliest entry
+    '+', // End with latest entry
+  );
 
   yield* Effect.logInfo(
     `Retrieved ${entries.length} entries from stream ${streamKey}`,

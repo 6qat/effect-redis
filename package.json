@@ -30,6 +30,6 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@effect/platform-bun": "^0.67.3"
+    "@effect/platform-bun": "^0.69.2"
   }
 }

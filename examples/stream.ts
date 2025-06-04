@@ -4,11 +4,16 @@ import {
   RedisConnectionOptionsLive,
   RedisPubSub,
   RedisPubSubLive,
+  RedisStream,
+  RedisStreamLive,
 } from '../src';
 
 const program = Effect.gen(function* () {
   const incomingQueue = yield* Queue.unbounded<string>();
   const redisPubSub = yield* RedisPubSub;
+  const redisStream = yield* RedisStream;
+  // yield* redisStream.xadd('raw', '*', { message: 'test' });
+
   yield* redisPubSub.subscribe('raw', (message: string) => {
     Queue.unsafeOffer(incomingQueue, message);
   });
@@ -17,7 +22,8 @@ const program = Effect.gen(function* () {
     stream,
     Stream.filter((message) => message.startsWith('T:WIN')),
     Stream.tap((message) =>
-      redisPubSub.publish('winfut', JSON.stringify(message)),
+      // redisPubSub.publish('winfut', JSON.stringify(message)),
+      redisStream.xadd('winfut', '*', { message }),
     ),
     Stream.runDrain,
     Effect.fork,
@@ -33,9 +39,15 @@ BunRuntime.runMain(
       url: `redis://${redisHost}:${redisPort}`,
     });
 
+    const redisPubSubLayer = Layer.provide(RedisPubSubLive, redisOptions);
+    const redisStreamLayer = Layer.provide(RedisStreamLive, redisOptions);
+
     return yield* pipe(
       Effect.scoped(
-        Effect.provide(program, Layer.provide(RedisPubSubLive, redisOptions)),
+        Effect.provide(
+          program,
+          Layer.provideMerge(redisPubSubLayer, redisStreamLayer),
+        ),
       ),
       Effect.catchAll((error) => {
         return Effect.log(`🚫 Recovering from error ${error}`);

@@ -62,7 +62,7 @@ class RedisPersistence extends Context.Tag('RedisPersistence')<
 // Stream related types
 export interface StreamEntry {
   id: RedisArgument;
-  message: Record<string, RedisArgument>;
+  message: Record<string, string>;
 }
 
 interface RedisStreamShape {
@@ -83,9 +83,9 @@ interface RedisStreamShape {
 
   // Read a range of entries from a stream
   xrange: (
-    key: string,
-    start: string, // '-' for earliest available
-    end: string, // '+' for latest available
+    key: RedisArgument,
+    start: RedisArgument, // '-' for earliest available
+    end: RedisArgument, // '+' for latest available
     count?: number,
   ) => Effect.Effect<StreamEntry[], RedisError, never>;
 }
@@ -214,7 +214,9 @@ const RedisPubSubLive = Layer.scoped(
 
 // Redis Stream implementation
 const bootstrapRedisStreamServiceEffect = Effect.gen(function* () {
-  const client = yield* redisClientEffect;
+  // Separate connections: one dedicated to writes (producer) and one to reads (consumer)
+  const clientProducer = yield* redisClientEffect;
+  const clientConsumer = yield* redisClientEffect;
 
   return RedisStream.of({
     xadd: (
@@ -225,7 +227,7 @@ const bootstrapRedisStreamServiceEffect = Effect.gen(function* () {
       Effect.tryPromise({
         try: async () => {
           // Pass the message object directly to xAdd
-          return await client.xAdd(key, id, message);
+          return await clientProducer.xAdd(key, id, message);
         },
         catch: (e) =>
           new RedisError({
@@ -254,7 +256,7 @@ const bootstrapRedisStreamServiceEffect = Effect.gen(function* () {
 
           // Create proper XReadStream objects instead of arrays
           const streams = [{ key, id }];
-          const result = await client.xRead(streams, options);
+          const result = await clientConsumer.xRead(streams, options);
 
           if (!result) {
             return [];
@@ -299,7 +301,12 @@ const bootstrapRedisStreamServiceEffect = Effect.gen(function* () {
           }),
       }),
 
-    xrange: (key: string, start: string, end: string, count?: number) =>
+    xrange: (
+      key: RedisArgument,
+      start: RedisArgument,
+      end: RedisArgument,
+      count?: number,
+    ) =>
       Effect.tryPromise({
         try: async () => {
           const options: Record<string, number> = {};
@@ -308,7 +315,7 @@ const bootstrapRedisStreamServiceEffect = Effect.gen(function* () {
             options.COUNT = count;
           }
 
-          const result = await client.xRange(key, start, end, options);
+          const result = await clientConsumer.xRange(key, start, end, options);
 
           // Transform result into StreamEntry[] format
           return result.map((msg) => ({
