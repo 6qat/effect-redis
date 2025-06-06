@@ -52,6 +52,10 @@ interface RedisPersistenceShape {
     key: string,
     value: string,
   ) => Effect.Effect<void, RedisError, never>;
+  sAdd: (
+    key: string,
+    members: string[],
+  ) => Effect.Effect<void, RedisError, never>;
 }
 
 class RedisPersistence extends Context.Tag('RedisPersistence')<
@@ -175,6 +179,15 @@ const bootstrapRedisPersistenceServiceEffect = Effect.gen(function* () {
           new RedisError({
             cause: e,
             message: 'Error in `Redis.setValue`',
+          }),
+      }),
+    sAdd: (key, members) =>
+      Effect.tryPromise({
+        try: () => client.sAdd(key, members),
+        catch: (e) =>
+          new RedisError({
+            cause: e,
+            message: 'Error in `Redis.sAdd`',
           }),
       }),
   });

@@ -1,6 +1,6 @@
 {
   "name": "effect-redis",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Simple Effect wrapper for Redis.",
   "module": "dist/index.js",
   "main": "dist/index.js",
