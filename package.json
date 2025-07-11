@@ -6,7 +6,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build:main": "bun build --minify-syntax --minify-whitespace ./src/index.ts --outdir ./dist --target node --format esm",
     "build:types": "bun tsc --emitDeclarationOnly --outDir dist",
@@ -17,15 +20,15 @@
     "lint": "biome lint ."
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.1.1",
     "@types/bun": "latest"
   },
   "peerDependencies": {
-    "effect": "^3.16.2",
+    "effect": "^3.16.10",
     "redis": "^5.1.0",
     "typescript": "^5"
   },
   "dependencies": {
-    "@effect/platform-bun": "^0.69.2"
+    "@effect/platform-bun": "^0.72.17"
   }
 }
